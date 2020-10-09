@@ -14,44 +14,6 @@
 
 // Main driver for application
 int main(int argc, char *argv[]) {
-    // If arguments supplied [PROBLEM 2]
-    if (argc > 1) {
-        // Counts amount of chars for proper memory alloc
-        int chars = 0;
-        for (int i = 1; i < argc; i++) {
-            int counter = 0;
-            while(argv[i][counter] != '\0') {
-                chars++;
-                counter++;
-            }
-            chars++;
-        }
-
-        // Prepares statements for echo from exefunc
-        char *command = "echo";
-        char *argument = calloc((chars + 1), sizeof(char));
-
-        // Append all argument words to one pointer
-        for (int i = 1; i < argc; i++) {
-            strcat(argument, argv[i]);
-            if ((i + 1) != argc) {
-                strcat(argument, " ");
-            }
-        }
-
-
-        // Construct double pointer to pass to exefunc
-        char **tokens = malloc(3 * sizeof(char*));
-        tokens[0] = command;
-        tokens[1] = argument;
-        tokens[2] = NULL;
-
-        exefunc(tokens);
-
-        free(argument);
-        free(tokens);
-    }
-
     // Begin normal shell
     while(1) {
         printWorkingDir();
@@ -216,19 +178,12 @@ int exefunc(char **arguments) {
     int append = 0;
     int terminal;
 
-    // Append the first argument to /bin/ for syscall location on system
-    int syslen = strlen(arguments[0]) + 5;
-    char *syscall = malloc(sizeof(char) * (syslen + 1));
-    strcpy(syscall, "/bin/");
-    strcat(syscall, arguments[0]);
-
     // If > or >> are encountered, obtain file name for output and remove > or >> from arguments
     while(arguments[pos] != NULL) {
         if (strcmp(arguments[pos], ">") == 0) {
             overwrite = 1;
             if (arguments[pos + 1] == NULL) {
                 printf("Invalid file name\n");
-                free(syscall);
                 return -1;
             }
             // Removes '>'
@@ -240,7 +195,6 @@ int exefunc(char **arguments) {
             append = 1;
             if (arguments[pos + 1] == NULL) {
                 printf("Invalid file name\n");
-                free(syscall);
                 return -1;
             }
             // Removes '>>'
@@ -264,7 +218,6 @@ int exefunc(char **arguments) {
 
         if (file == -1) {
             printf("Could not open file\n");
-            free(syscall);
             return -1;
         }
 
@@ -277,9 +230,12 @@ int exefunc(char **arguments) {
     }
 
     // Fork out and execute, main thread waits for child to finish then continues
+    // There is a bug where upon an invalid command, you have to type exit multiple times
+    // Only applicable for invalid input though, don't know why
     int status;
-    if (fork() == 0) { 
-        execv(syscall, arguments);
+    if (fork() == 0) {
+        execvp(arguments[0], arguments);
+        exit(EXIT_SUCCESS);
     } else {
         wait(&status);
         if (overwrite == 1 || append == 1) {
@@ -287,8 +243,6 @@ int exefunc(char **arguments) {
             close(terminal);
         }
     }
-
-    free(syscall);
     return 0;
 }
 
